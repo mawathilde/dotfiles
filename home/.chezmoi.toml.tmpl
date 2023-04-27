@@ -1,0 +1,24 @@
+{{/* boolean feature tags */}}
+{{- $personal := false -}}{{/* true if this machine should have personal secrets */}}
+{{- "" -}}
+
+{{/* Prompt for user data */}}
+{{- $email := promptStringOnce . "email" "Email address" -}}
+{{- $username := promptStringOnce . "username" "Your username" -}}
+
+{{/* Prompt for Keepassxc */}}
+{{- $database := promptStringOnce . "database" "Your Keepassxc database" -}}
+
+[data]
+    email = {{ $email | quote }}
+    username = {{ $username | quote }}
+    personal = {{ $personal }}
+[git]
+    autoCommit = false
+    autoPush = false
+[edit]
+    command = "codium"
+    args = ["--wait"]
+[keepassxc]
+  command = "keepassxc-cli"
+  database = {{ $database | quote }}

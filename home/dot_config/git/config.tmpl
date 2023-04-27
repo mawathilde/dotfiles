@@ -1,0 +1,14 @@
+[user]
+	email = {{ .email }}
+	name = {{ .username }}
+[init]
+	defaultBranch = master
+[alias]
+    s = status
+	co = checkout
+	cob = checkout -b
+	del = branch -D
+	br = branch --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(contents:subject) %(color:green)(%(committerdate:relative)) [%(authorname)]' --sort=-committerdate
+	undo = reset HEAD~1 --mixed
+	res = !git reset --hard
+	lg = !git log --pretty=format:\"%C(magenta)%h%Creset -%C(red)%d%Creset %s %C(dim green)(%cr) [%an]\" --abbrev-commit -30
