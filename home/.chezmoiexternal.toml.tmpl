@@ -1,0 +1,10 @@
+{{ if eq .chezmoi.os "linux" }}
+[".local/bin/ngrok"]
+    type="file"
+    executable=true
+    url="https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-{{ .chezmoi.os }}-{{ .chezmoi.arch }}.tgz"
+    refreshPeriod = "168h"
+    ['.local/bin/ngrok'.filter]
+        command = "tar"
+        args = ["--extract", "--file", "/dev/stdin", "--gzip", "--to-stdout", "ngrok"]
+{{ end }}
