@@ -13,3 +13,4 @@ fi
 
 
 source $HOME/.bashrc.d/completions.d/chezmoi
+source $HOME/.bashrc.d/completions.d/rclone
