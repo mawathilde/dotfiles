@@ -10,6 +10,11 @@ case $- in
       *) return;;
 esac
 
+# DENO
+export DENO_INSTALL="/home/mawathilde/.deno"
+export PATH="$DENO_INSTALL/bin:$PATH"
+
+# Sub bashrc
 source $HOME/.bashrc.d/prompt
 source $HOME/.bashrc.d/history
 source $HOME/.bashrc.d/aliases
