@@ -10,9 +10,11 @@ case $- in
       *) return;;
 esac
 
-# DENO
 export DENO_INSTALL="/home/mawathilde/.deno"
+
+# Additional paths
 export PATH="$DENO_INSTALL/bin:$PATH"
+. "$HOME/.cargo/env"
 
 # Sub bashrc
 source $HOME/.bashrc.d/prompt

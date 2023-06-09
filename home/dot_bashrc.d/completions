@@ -11,6 +11,10 @@ if ! shopt -oq posix; then
   fi
 fi
 
+if type -P rustup > /dev/null; then
+    source <( rustup completions bash )          # for rustup
+    source <( rustup completions bash cargo )    # for cargo
+fi
 
 source $HOME/.bashrc.d/completions.d/chezmoi
 source $HOME/.bashrc.d/completions.d/rclone
