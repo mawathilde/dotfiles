@@ -15,7 +15,7 @@ export DENO_INSTALL="/home/mawathilde/.deno"
 # Additional paths
 export PATH="$DENO_INSTALL/bin:$PATH"
 
-if type -P "$HOME/.cargo/env" > /dev/null; then
+if [ -f "$HOME/.cargo/env" ]; then
     . "$HOME/.cargo/env"
 fi
 
