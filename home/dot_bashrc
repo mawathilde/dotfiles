@@ -14,7 +14,10 @@ export DENO_INSTALL="/home/mawathilde/.deno"
 
 # Additional paths
 export PATH="$DENO_INSTALL/bin:$PATH"
-. "$HOME/.cargo/env"
+
+if type -P "$HOME/.cargo/env" > /dev/null; then
+    . "$HOME/.cargo/env"
+fi
 
 # Sub bashrc
 source $HOME/.bashrc.d/prompt
