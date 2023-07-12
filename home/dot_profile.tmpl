@@ -22,9 +22,9 @@ if [ -d "$HOME/.local/bin" ] ; then
 fi
 
 
+export JAVA_HOME={{ .javaHome }}
+
 # Added by Toolbox App
-export PATH="$PATH:/home/mawathilde/.local/share/JetBrains/Toolbox/scripts"
+export PATH="$PATH:/home/mawathilde/.local/share/JetBrains/Toolbox/scripts:$JAVA_HOME/bin"
 export VOLTA_HOME="$HOME/.volta"
 export PATH="$VOLTA_HOME/bin:$PATH"
-
-export JAVA_HOME={{ .javaHome }}
