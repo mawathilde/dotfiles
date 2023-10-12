@@ -4,4 +4,7 @@ alias ll='ls -lh'
 alias la='ls -A'
 alias l='ls -CF'
 
+alias c='xclip -selection clipboard'
+alias v='xclip -o -selection clipboard'
+
 alias scfg="grep -E -v '(^$|^#)'"
