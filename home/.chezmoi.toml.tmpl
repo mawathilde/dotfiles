@@ -7,9 +7,6 @@
 {{- $username := promptStringOnce . "username" "Your username" -}}
 {{- $javaHome := promptStringOnce . "javaHome" "Your javahome path" -}}
 
-{{/* Prompt for Keepassxc */}}
-{{- $database := promptStringOnce . "database" "Your Keepassxc database" -}}
-
 [data]
     email = {{ $email | quote }}
     username = {{ $username | quote }}
@@ -21,6 +18,3 @@
 [edit]
     command = "codium"
     args = ["--wait"]
-[keepassxc]
-  command = "keepassxc-cli"
-  database = {{ $database | quote }}
