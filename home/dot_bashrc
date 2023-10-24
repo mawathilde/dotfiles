@@ -10,7 +10,7 @@ case $- in
       *) return;;
 esac
 
-export DENO_INSTALL="/home/mawathilde/.deno"
+export DENO_INSTALL="/home/$USER/.deno"
 
 # Additional paths
 export PATH="$DENO_INSTALL/bin:$PATH"
