@@ -14,10 +14,13 @@ export DENO_INSTALL="/home/$USER/.deno"
 
 # Additional paths
 export PATH="$DENO_INSTALL/bin:$PATH"
+export PATH=$PATH:/usr/local/go/bin
 
 if [ -f "$HOME/.cargo/env" ]; then
     . "$HOME/.cargo/env"
 fi
+
+source $HOME/.sdkman/bin/sdkman-init.sh
 
 # Sub bashrc
 source $HOME/.bashrc.d/prompt
