@@ -7,4 +7,16 @@
     ['.local/bin/ngrok'.filter]
         command = "tar"
         args = ["--extract", "--file", "/dev/stdin", "--gzip", "--to-stdout", "ngrok"]
+
+[".local/share/fonts/FiraCode-Regular-NerdFont-CompleteMono.ttf"]
+    type="file"
+    url="https://raw.githubusercontent.com/ryanoasis/nerd-fonts/v3.2.1/patched-fonts/FiraCode/Regular/FiraCodeNerdFontMono-Regular.ttf"
+    refreshPeriod="168h"
+
+[ ".oh-my-zsh/custom/plugins/zsh-syntax-highlighting" ]
+  type= "git-repo"
+  url= "https://github.com/zsh-users/zsh-syntax-highlighting.git"
+  refreshPeriod = "168h"
+  stripComponents= 1
+  exact= true
 {{ end }}
