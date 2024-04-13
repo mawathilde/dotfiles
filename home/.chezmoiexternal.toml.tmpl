@@ -8,15 +8,28 @@
         command = "tar"
         args = ["--extract", "--file", "/dev/stdin", "--gzip", "--to-stdout", "ngrok"]
 
+[".oh-my-zsh"]
+    type = "archive"
+    url = "https://github.com/ohmyzsh/ohmyzsh/archive/master.tar.gz"
+    exact = true
+    stripComponents = 1
+    refreshPeriod = "168h"
+
+[".oh-my-zsh/custom/themes/powerlevel10k"]
+    type = "archive"
+    url = "https://github.com/romkatv/powerlevel10k/archive/{{ (gitHubLatestRelease "romkatv/powerlevel10k").TagName }}.tar.gz"
+    exact = true
+    stripComponents = 1
+    
+[".oh-my-zsh/custom/plugins/zsh-syntax-highlighting"]
+    type = "archive"
+    url = "https://github.com/zsh-users/zsh-syntax-highlighting/archive/master.tar.gz"
+    exact = true
+    stripComponents = 1
+    refreshPeriod = "168h"
+
 [".local/share/fonts/FiraCode-Regular-NerdFont-CompleteMono.ttf"]
     type="file"
     url="https://raw.githubusercontent.com/ryanoasis/nerd-fonts/{{ (gitHubLatestRelease "ryanoasis/nerd-fonts").TagName }}/patched-fonts/FiraCode/Regular/FiraCodeNerdFontMono-Regular.ttf"
     refreshPeriod="168h"
-
-[ ".oh-my-zsh/custom/plugins/zsh-syntax-highlighting" ]
-  type= "git-repo"
-  url= "https://github.com/zsh-users/zsh-syntax-highlighting.git"
-  refreshPeriod = "168h"
-  stripComponents= 1
-  exact= true
 {{ end }}
