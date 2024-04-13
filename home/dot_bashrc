@@ -20,8 +20,6 @@ if [ -f "$HOME/.cargo/env" ]; then
     . "$HOME/.cargo/env"
 fi
 
-source $HOME/.sdkman/bin/sdkman-init.sh
-
 # Sub bashrc
 source $HOME/.bashrc.d/prompt
 source $HOME/.bashrc.d/history

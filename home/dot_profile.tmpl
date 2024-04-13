@@ -13,8 +13,7 @@ if [ -d "$HOME/.local/bin" ] ; then
     PATH="$HOME/.local/bin:$PATH"
 fi
 
-
-export JAVA_HOME={{ .javaHome }}
+source "/home/mawa/.sdkman/bin/sdkman-init.sh"
 
 # Added by Toolbox App
 export PATH="$PATH:/home/$USER/.local/share/JetBrains/Toolbox/scripts:$JAVA_HOME/bin"

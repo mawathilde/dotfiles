@@ -1,17 +1,47 @@
 {{/* boolean feature tags */}}
+{{- $ephemeral := false -}}{{/* true if this machine is ephemeral, e.g. a cloud or VM instance */}}
+{{- $headless := false -}}{{/* true if this machine does not have a screen and keyboard */}}
 {{- $personal := false -}}{{/* true if this machine should have personal secrets */}}
 {{- "" -}}
 
-{{/* Prompt for user data */}}
-{{- $email := promptStringOnce . "email" "Email address" -}}
-{{- $username := promptStringOnce . "username" "Your username" -}}
-{{- $javaHome := promptStringOnce . "javaHome" "Your javahome path" -}}
+{{- $osID := .chezmoi.os -}}
+{{- if (and (eq .chezmoi.os "linux") (hasKey .chezmoi.osRelease "id")) -}}
+{{-   $osID = printf "%s-%s" .chezmoi.os .chezmoi.osRelease.id -}}
+{{- end -}}
+
+
+{{/* detect GitHub codespaces, VSCode remote containers, Docker containers, Multipass VMs, and Vagrant boxes */}}
+{{- if or (env "CODESPACES") (env "REMOTE_CONTAINERS_IPC") (eq .chezmoi.username "root" "ubuntu" "vagrant" "vscode") -}}
+{{-   $ephemeral = true -}}
+{{-   $headless = true -}}
+{{- end -}}
+
+{{- $hostname := .chezmoi.hostname -}}
+{{- if not $ephemeral -}}
+{{-   if eq $hostname "DEBIAN-MAWA" -}}
+{{-     $personal = true -}}
+{{-   else if eq $hostname "LAPTOP-MAWA" -}}
+{{-     $personal = true -}}
+{{-   else if stdinIsATTY -}}
+{{-     $headless = promptBoolOnce . "headless" "headless" -}}
+{{-     $ephemeral = promptBoolOnce . "ephemeral" "ephemeral" -}}
+{{-   else -}}
+{{-     $ephemeral = true -}}
+{{-     $headless = true -}}
+{{-   end -}}
+{{- end -}}
+
+{{- $username := "Mawatilde" -}}
+{{- $email := "dev@mawathilde.fr" -}}
 
 [data]
-    email = {{ $email | quote }}
+    ephemeral = {{ $ephemeral }}
     username = {{ $username | quote }}
-    javaHome = {{ $javaHome | quote }}
+    email = {{ $email | quote }}
+    headless = {{ $headless }}
+    hostname = {{ $hostname | quote }}
     personal = {{ $personal }}
+    osid = {{ $osID | quote }}
 [git]
     autoCommit = false
     autoPush = false

@@ -19,6 +19,7 @@
     type = "archive"
     url = "https://github.com/romkatv/powerlevel10k/archive/{{ (gitHubLatestRelease "romkatv/powerlevel10k").TagName }}.tar.gz"
     exact = true
+    refreshPeriod = "168h"
     stripComponents = 1
     
 [".oh-my-zsh/custom/plugins/zsh-syntax-highlighting"]
@@ -32,4 +33,5 @@
     type="file"
     url="https://raw.githubusercontent.com/ryanoasis/nerd-fonts/{{ (gitHubLatestRelease "ryanoasis/nerd-fonts").TagName }}/patched-fonts/FiraCode/Regular/FiraCodeNerdFontMono-Regular.ttf"
     refreshPeriod="168h"
+
 {{ end }}
