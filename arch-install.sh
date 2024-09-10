@@ -49,8 +49,6 @@ if [ ! -f /sys/firmware/efi/fw_platform_size ]; then
 	exit 2
 fi
 
-echo -e "\n### Setting up clock"
-
 echo -e "\n### Installing additional tools"
 pacman -Sy --noconfirm --needed git reflector terminus-font dialog wget
 
@@ -83,5 +81,83 @@ luks_header_device=$(get_choice "Installation" "Select disk to write LUKS header
 clear
 
 echo -e "\n### Setting up fastest mirrors"
-reflector --latest 30 --sort rate --save /etc/pacman.d/mirrorlist
+reflector --latest 30 --country France --sort rate --save /etc/pacman.d/mirrorlist
 
+## DISQUE
+
+echo -e "\n### Setting up partitions"
+umount -R /mnt 2> /dev/null || true
+cryptsetup luksClose luks 2> /dev/null || true
+
+lsblk -plnx size -o name "${device}" | xargs -n1 wipefs --all
+sgdisk --clear "${device}" --new 1::-551MiB "${device}" --new 2::0 --typecode 2:ef00 "${device}"
+sgdisk --change-name=1:primary --change-name=2:ESP "${device}"
+
+part_root="$(ls ${device}* | grep -E "^${device}p?1$")"
+part_boot="$(ls ${device}* | grep -E "^${device}p?2$")"
+
+if [ "$device" != "$luks_header_device" ]; then
+    cryptargs="--header $luks_header_device"
+else
+    cryptargs=""
+    luks_header_device="$part_root"
+fi
+
+echo -e "\n### Formatting partitions"
+mkfs.vfat -n "EFI" -F 32 "${part_boot}"
+echo -n ${password} | cryptsetup luksFormat --type luks2 --pbkdf argon2id --label luks $cryptargs "${part_root}"
+echo -n ${password} | cryptsetup luksOpen $cryptargs "${part_root}" luks
+mkfs.btrfs -L btrfs /dev/mapper/luks
+
+echo -e "\n### Setting up BTRFS subvolumes"
+mount /dev/mapper/luks /mnt
+btrfs subvolume create /mnt/root
+btrfs subvolume create /mnt/home
+btrfs subvolume create /mnt/docker
+btrfs subvolume create /mnt/temp
+umount /mnt
+
+mount -o noatime,nodiratime,compress=zstd,subvol=root /dev/mapper/luks /mnt
+mkdir -p /mnt/{mnt/btrfs-root,efi,home,var/{cache/pacman,log,tmp,lib/{aurbuild,archbuild,docker}},swap,.snapshots}
+mount "${part_boot}" /mnt/efi
+mount -o noatime,nodiratime,compress=zstd,subvol=/ /dev/mapper/luks /mnt/mnt/btrfs-root
+mount -o noatime,nodiratime,compress=zstd,subvol=home /dev/mapper/luks /mnt/home
+mount -o noatime,nodiratime,compress=zstd,subvol=docker /dev/mapper/luks /mnt/var/lib/docker
+mount -o noatime,nodiratime,compress=zstd,subvol=temp /dev/mapper/luks /mnt/var/tmp
+
+
+
+cryptsetup luksHeaderBackup "${luks_header_device}" --header-backup-file /tmp/header.img
+luks_header_size="$(stat -c '%s' /tmp/header.img)"
+rm -f /tmp/header.img
+
+echo "cryptdevice=PARTLABEL=primary:luks:allow-discards cryptheader=LABEL=luks:0:$luks_header_size root=LABEL=btrfs rw rootflags=subvol=root quiet mem_sleep_default=deep" > /mnt/etc/kernel/cmdline
+
+echo "FONT=$font" > /mnt/etc/vconsole.confs
+genfstab -L /mnt >> /mnt/etc/fstab
+echo "${hostname}" > /mnt/etc/hostname
+echo "fr_FR.UTF-8 UTF-8" >> /mnt/etc/locale.gen
+ln -sf /usr/share/zoneinfo/Europe/Paris /mnt/etc/localtime
+arch-chroot /mnt locale-gen
+cat << EOF > /mnt/etc/mkinitcpio.conf
+MODULES=()
+BINARIES=()
+FILES=()
+HOOKS=(base consolefont udev autodetect modconf block encrypt-dh filesystems keyboard)
+EOF
+
+arch-chroot /mnt mkinitcpio -p linux
+arch-chroot /mnt arch-secure-boot initial-setup
+
+echo -e "\n### Creating user"
+arch-chroot /mnt useradd -m -s /usr/bin/zsh "$user"
+for group in wheel network nzbget video input uucp; do
+    arch-chroot /mnt groupadd -rf "$group"
+    arch-chroot /mnt gpasswd -a "$user" "$group"
+done
+arch-chroot /mnt chsh -s /usr/bin/zsh
+echo "$user:$password" | arch-chroot /mnt chpasswd
+arch-chroot /mnt passwd -dl root
+
+echo -e "\n### Reboot now, and after power off remember to unplug the installation USB"
+umount -R /mnt
