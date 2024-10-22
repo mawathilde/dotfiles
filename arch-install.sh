@@ -144,7 +144,7 @@ cat << EOF > /mnt/etc/mkinitcpio.conf
 MODULES=()
 BINARIES=()
 FILES=()
-HOOKS=(base consolefont udev autodetect modconf block encrypt-dh filesystems keyboard)
+HOOKS=(base consolefont udev autodetect modconf block encrypt lvm2 filesystems keyboard)
 EOF
 
 arch-chroot /mnt mkinitcpio -p linux
