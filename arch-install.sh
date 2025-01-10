@@ -128,7 +128,7 @@ mount -o noatime,nodiratime,compress=zstd,subvol=docker /dev/mapper/luks /mnt/va
 mount -o noatime,nodiratime,compress=zstd,subvol=temp /dev/mapper/luks /mnt/var/tmp
 
 echo -e "\n### Installing packages"
-pacstrap -K /mnt base linux linux-firmware lvm2 man nano networkmanager 
+pacstrap -K /mnt base linux linux-firmware lvm2 networkmanager zsh
 
 cryptsetup luksHeaderBackup "${luks_header_device}" --header-backup-file /tmp/header.img
 luks_header_size="$(stat -c '%s' /tmp/header.img)"
