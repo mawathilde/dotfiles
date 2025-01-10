@@ -2,6 +2,8 @@
 # I was inspired by the following scripts:
 # - https://github.com/maximbaz/dotfiles/blob/fedora/install.sh
 
+# curl -sL https://install.mawathilde.fr | bash
+
 set -u pipefail
 trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
 
@@ -126,7 +128,7 @@ mount -o noatime,nodiratime,compress=zstd,subvol=docker /dev/mapper/luks /mnt/va
 mount -o noatime,nodiratime,compress=zstd,subvol=temp /dev/mapper/luks /mnt/var/tmp
 
 echo -e "\n### Installing packages"
-pacstrap -K /mnt base linux linux-firmware lvm2 man nano networkmanager
+pacstrap -K /mnt base linux linux-firmware arch-secure-boot lvm2 man nano networkmanager 
 
 cryptsetup luksHeaderBackup "${luks_header_device}" --header-backup-file /tmp/header.img
 luks_header_size="$(stat -c '%s' /tmp/header.img)"
