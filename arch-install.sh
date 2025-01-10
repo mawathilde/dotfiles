@@ -52,7 +52,7 @@ if [ ! -f /sys/firmware/efi/fw_platform_size ]; then
 fi
 
 echo -e "\n### Installing additional tools"
-pacman -Sy --noconfirm --needed git reflector terminus-font dialog wget
+pacman -Syu --noconfirm --needed archlinux-keyring git reflector terminus-font dialog wget
 
 echo -e "\n### HiDPI screens"
 noyes=("Yes" "The font is too small" "No" "The font size is just fine")
