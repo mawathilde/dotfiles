@@ -10,6 +10,8 @@ trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
 exec 1> >(tee "stdout.log")
 exec 2> >(tee "stderr.log" >&2)
 
+CONFIGS_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"/configs
+
 # Dialog
 BACKTITLE="Arch Linux installation"
 
@@ -52,7 +54,9 @@ if [ ! -f /sys/firmware/efi/fw_platform_size ]; then
 fi
 
 echo -e "\n### Installing additional tools"
-pacman -Syu --noconfirm --needed archlinux-keyring git reflector terminus-font dialog wget
+pacman -S --noconfirm archlinux-keyring 
+pacman -S --noconfirm --needed pacman-contrib terminus-font
+pacman -S --noconfirm git reflectordialog wget
 
 echo -e "\n### HiDPI screens"
 noyes=("Yes" "The font is too small" "No" "The font size is just fine")
@@ -82,85 +86,156 @@ clear
 luks_header_device=$(get_choice "Installation" "Select disk to write LUKS header to" "${devicelist[@]}") || exit 1
 clear
 
-echo -e "\n### Setting up fastest mirrors"
-reflector --latest 30 --country France --sort rate --save /etc/pacman.d/mirrorlist
+echo -ne "
+-------------------------------------------------------------------------
+                    Setting up France mirrors for faster downloads
+-------------------------------------------------------------------------
+"
+reflector -a 48 -c France -f 5 -l 20 --sort rate --save /etc/pacman.d/mirrorlist
+mkdir /mnt &>/dev/null # Hiding error message if any
+echo -ne "
+-------------------------------------------------------------------------
+                    Installing Prerequisites
+-------------------------------------------------------------------------
+"
+pacman -S --noconfirm --needed gptfdisk btrfs-progs glibc
+echo -ne "
+-------------------------------------------------------------------------
+                    Formating Disk
+-------------------------------------------------------------------------
+"
 
-## DISQUE
+umount -A --recursive /mnt # make sure everything is unmounted before we start
+# disk prep
+sgdisk -Z ${device} # zap all on disk
+sgdisk -a 2048 -o ${device} # new gpt disk 2048 alignment
 
-echo -e "\n### Setting up partitions"
-umount -R /mnt 2> /dev/null || true
-cryptsetup luksClose luks 2> /dev/null || true
+# create partitions
+sgdisk -n 1::+1M --typecode=1:ef02 --change-name=1:'BIOSBOOT' ${device} # partition 1 (BIOS Boot Partition)
+sgdisk -n 2::+300M --typecode=2:ef00 --change-name=2:'EFIBOOT' ${device} # partition 2 (UEFI Boot Partition)
+sgdisk -n 3::-0 --typecode=3:8300 --change-name=3:'ROOT' ${device} # partition 3 (Root), default start, remaining
+if [[ ! -d "/sys/firmware/efi" ]]; then # Checking for bios system
+    sgdisk -A 1:set:2 ${device} # set partition 2 (UEFI Boot Partition) as bootable
+fi
+partprobe ${device} # reread partition table to ensure it is correct
 
-lsblk -plnx size -o name "${device}" | xargs -n1 wipefs --all
-sgdisk --clear "${device}" --new 1::-551MiB "${device}" --new 2::0 --typecode 2:ef00 "${device}"
-sgdisk --change-name=1:primary --change-name=2:ESP "${device}"
+# make filesystems
+echo -ne "
+-------------------------------------------------------------------------
+                    Creating Filesystems
+-------------------------------------------------------------------------
+"
+# @description Creates the btrfs subvolumes. 
+createsubvolumes () {
+    btrfs subvolume create /mnt/@
+    btrfs subvolume create /mnt/@home
+    btrfs subvolume create /mnt/@var
+    btrfs subvolume create /mnt/@tmp
+    btrfs subvolume create /mnt/@.snapshots
+}
 
-part_root="$(ls ${device}* | grep -E "^${device}p?1$")"
-part_boot="$(ls ${device}* | grep -E "^${device}p?2$")"
+# @description Mount all btrfs subvolumes after root has been mounted.
+mountallsubvol () {
+    mount -o ${MOUNT_OPTIONS},subvol=@home ${partition3} /mnt/home
+    mount -o ${MOUNT_OPTIONS},subvol=@tmp ${partition3} /mnt/tmp
+    mount -o ${MOUNT_OPTIONS},subvol=@var ${partition3} /mnt/var
+    mount -o ${MOUNT_OPTIONS},subvol=@.snapshots ${partition3} /mnt/.snapshots
+}
 
-if [ "$device" != "$luks_header_device" ]; then
-    cryptargs="--header $luks_header_device"
+# @description BTRFS subvolulme creation and mounting. 
+subvolumesetup () {
+	# create nonroot subvolumes
+    createsubvolumes     
+	# unmount root to remount with subvolume 
+    umount /mnt
+	# mount @ subvolume
+    mount -o ${MOUNT_OPTIONS},subvol=@ ${partition3} /mnt
+	# make directories home, .snapshots, var, tmp
+    mkdir -p /mnt/{home,var,tmp,.snapshots}
+	# mount subvolumes
+    mountallsubvol
+}
+
+
+if [[ "${VOLUME}" =~ "nvme" ]]; then
+    partition2=${DISK}p2
+    partition3=${DISK}p3
 else
-    cryptargs=""
-    luks_header_device="$part_root"
+    partition2=${DISK}2
+    partition3=${DISK}3
 fi
 
-echo -e "\n### Formatting partitions"
-mkfs.vfat -n "EFI" -F 32 "${part_boot}"
-echo -n ${password} | cryptsetup luksFormat --type luks2 --pbkdf argon2id --label luks $cryptargs "${part_root}"
-echo -n ${password} | cryptsetup luksOpen $cryptargs "${part_root}" luks
-mkfs.btrfs -L btrfs /dev/mapper/luks
+mkfs.vfat -F32 -n "EFIBOOT" ${partition2}
+# enter luks password to cryptsetup and format root partition
+echo -n "${password}" | cryptsetup -y -v luksFormat ${partition3} -
+# open luks container and ROOT will be place holder 
+echo -n "${password}" | cryptsetup open ${partition3} ROOT -
+# now format that container
+mkfs.btrfs -L ROOT ${partition3}
+# create subvolumes for btrfs
+mount -t btrfs ${partition3} /mnt
+subvolumesetup
+# store uuid of encrypted partition for grub
+echo ENCRYPTED_PARTITION_UUID=$(blkid -s UUID -o value ${partition3}) >> $CONFIGS_DIR/setup.conf
 
-echo -e "\n### Setting up BTRFS subvolumes"
-mount /dev/mapper/luks /mnt
-btrfs subvolume create /mnt/root
-btrfs subvolume create /mnt/home
-btrfs subvolume create /mnt/docker
-btrfs subvolume create /mnt/temp
-umount /mnt
+# mount target
+mkdir -p /mnt/boot/efi
+mount -t vfat -L EFIBOOT /mnt/boot/
 
-mount -o noatime,nodiratime,compress=zstd,subvol=root /dev/mapper/luks /mnt
-mkdir -p /mnt/{mnt/btrfs-root,efi,home,var/{cache/pacman,log,tmp,lib/{aurbuild,archbuild,docker}},swap,.snapshots}
-mount "${part_boot}" /mnt/efi
-mount -o noatime,nodiratime,compress=zstd,subvol=/ /dev/mapper/luks /mnt/mnt/btrfs-root
-mount -o noatime,nodiratime,compress=zstd,subvol=home /dev/mapper/luks /mnt/home
-mount -o noatime,nodiratime,compress=zstd,subvol=docker /dev/mapper/luks /mnt/var/lib/docker
-mount -o noatime,nodiratime,compress=zstd,subvol=temp /dev/mapper/luks /mnt/var/tmp
+if ! grep -qs '/mnt' /proc/mounts; then
+    echo "Drive is not mounted can not continue"
+    echo "Rebooting in 3 Seconds ..." && sleep 1
+    echo "Rebooting in 2 Seconds ..." && sleep 1
+    echo "Rebooting in 1 Second ..." && sleep 1
+    reboot now
+fi
 
-echo -e "\n### Installing packages"
-pacstrap -K /mnt base linux linux-firmware lvm2 networkmanager zsh
+echo -ne "
+-------------------------------------------------------------------------
+                    Arch Install on Main Drive
+-------------------------------------------------------------------------
+"
+pacstrap /mnt base base-devel linux linux-firmware vim nano sudo archlinux-keyring wget libnewt --noconfirm --needed
+echo "keyserver hkp://keyserver.ubuntu.com" >> /mnt/etc/pacman.d/gnupg/gpg.conf
+cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
 
-cryptsetup luksHeaderBackup "${luks_header_device}" --header-backup-file /tmp/header.img
-luks_header_size="$(stat -c '%s' /tmp/header.img)"
-rm -f /tmp/header.img
-
-echo "cryptdevice=PARTLABEL=primary:luks:allow-discards cryptheader=LABEL=luks:0:$luks_header_size root=LABEL=btrfs rw rootflags=subvol=root quiet mem_sleep_default=deep" > /mnt/etc/kernel/cmdline
-
-echo "FONT=$font" > /mnt/etc/vconsole.confs
 genfstab -L /mnt >> /mnt/etc/fstab
-echo "${hostname}" > /mnt/etc/hostname
-echo "fr_FR.UTF-8 UTF-8" >> /mnt/etc/locale.gen
-ln -sf /usr/share/zoneinfo/Europe/Paris /mnt/etc/localtime
-arch-chroot /mnt locale-gen
-cat << EOF > /mnt/etc/mkinitcpio.conf
-MODULES=()
-BINARIES=()
-FILES=()
-HOOKS=(base consolefont udev autodetect modconf block encrypt lvm2 filesystems keyboard)
-EOF
+echo " 
+  Generated /etc/fstab:
+"
+cat /mnt/etc/fstab
 
-arch-chroot /mnt mkinitcpio -p linux
-#arch-chroot /mnt arch-secure-boot initial-setup
+echo -ne "
+-------------------------------------------------------------------------
+                    GRUB BIOS Bootloader Install & Check
+-------------------------------------------------------------------------
+"
+if [[ ! -d "/sys/firmware/efi" ]]; then
+    grub-install --boot-directory=/mnt/boot ${DISK}
+else
+    pacstrap /mnt efibootmgr --noconfirm --needed
+fi
 
-echo -e "\n### Creating user"
-arch-chroot /mnt useradd -m -s /usr/bin/zsh "$user"
-for group in wheel network nzbget video input uucp; do
-    arch-chroot /mnt groupadd -rf "$group"
-    arch-chroot /mnt gpasswd -a "$user" "$group"
-done
-arch-chroot /mnt chsh -s /usr/bin/zsh
-echo "$user:$password" | arch-chroot /mnt chpasswd
-arch-chroot /mnt passwd -dl root
-
-echo -e "\n### Reboot now, and after power off remember to unplug the installation USB"
-umount -R /mnt
+echo -ne "
+-------------------------------------------------------------------------
+                    Checking for low memory systems <8G
+-------------------------------------------------------------------------
+"
+TOTAL_MEM=$(cat /proc/meminfo | grep -i 'memtotal' | grep -o '[[:digit:]]*')
+if [[  $TOTAL_MEM -lt 8000000 ]]; then
+    # Put swap into the actual system, not into RAM disk, otherwise there is no point in it, it'll cache RAM into RAM. So, /mnt/ everything.
+    mkdir -p /mnt/opt/swap # make a dir that we can apply NOCOW to to make it btrfs-friendly.
+    chattr +C /mnt/opt/swap # apply NOCOW, btrfs needs that.
+    dd if=/dev/zero of=/mnt/opt/swap/swapfile bs=1M count=2048 status=progress
+    chmod 600 /mnt/opt/swap/swapfile # set permissions.
+    chown root /mnt/opt/swap/swapfile
+    mkswap /mnt/opt/swap/swapfile
+    swapon /mnt/opt/swap/swapfile
+    # The line below is written to /mnt/ but doesn't contain /mnt/, since it's just / for the system itself.
+    echo "/opt/swap/swapfile	none	swap	sw	0	0" >> /mnt/etc/fstab # Add swap to fstab, so it KEEPS working after installation.
+fi
+echo -ne "
+-------------------------------------------------------------------------
+                    SYSTEM READY FOR 1-setup.sh
+-------------------------------------------------------------------------
+"
