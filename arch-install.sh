@@ -53,8 +53,6 @@ if [ ! -f /sys/firmware/efi/fw_platform_size ]; then
 	exit 2
 fi
 
-source $CONFIGS_DIR/setup.conf
-
 echo -e "\n### Installing additional tools"
 pacman -Sy --noconfirm archlinux-keyring 
 pacman -Sy --noconfirm --needed pacman-contrib terminus-font
