@@ -10,7 +10,7 @@ trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
 exec 1> >(tee "stdout.log")
 exec 2> >(tee "stderr.log" >&2)
 
-CONFIGS_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"/configs
+CONFIGS_DIR="$( pwd )"/configs
 
 # Dialog
 BACKTITLE="Arch Linux installation"
