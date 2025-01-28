@@ -104,7 +104,7 @@ echo -ne "
 -------------------------------------------------------------------------
 "
 
-umount -A --recursive /mnt # make sure everything is unmounted before we start
+#umount -A --recursive /mnt # make sure everything is unmounted before we start
 # disk prep
 sgdisk -Z ${device} # zap all on disk
 sgdisk -a 2048 -o ${device} # new gpt disk 2048 alignment
