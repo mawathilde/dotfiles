@@ -12,6 +12,8 @@ exec 2> >(tee "stderr.log" >&2)
 
 CONFIGS_DIR="$( pwd )"/configs
 
+MOUNT_OPTIONS="noatime,compress=zstd,ssd,commit=120"
+
 # Dialog
 BACKTITLE="Arch Linux installation"
 
@@ -81,9 +83,6 @@ devicelist=$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac | 
 read -r -a devicelist <<<$devicelist
 
 device=$(get_choice "Installation" "Select installation disk" "${devicelist[@]}") || exit 1
-clear
-
-luks_header_device=$(get_choice "Installation" "Select disk to write LUKS header to" "${devicelist[@]}") || exit 1
 clear
 
 echo -ne "
