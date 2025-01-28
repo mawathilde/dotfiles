@@ -156,12 +156,12 @@ subvolumesetup () {
 }
 
 
-if [[ "${VOLUME}" =~ "nvme" ]]; then
-    partition2=${DISK}p2
-    partition3=${DISK}p3
+if [[ "${device}" =~ "nvme" ]]; then
+    partition2=${device}p2
+    partition3=${device}p3
 else
-    partition2=${DISK}2
-    partition3=${DISK}3
+    partition2=${device}2
+    partition3=${device}3
 fi
 
 mkfs.vfat -F32 -n "EFIBOOT" ${partition2}
@@ -210,7 +210,7 @@ echo -ne "
 -------------------------------------------------------------------------
 "
 if [[ ! -d "/sys/firmware/efi" ]]; then
-    grub-install --boot-directory=/mnt/boot ${DISK}
+    grub-install --boot-directory=/mnt/boot ${device}
 else
     pacstrap /mnt efibootmgr --noconfirm --needed
 fi
