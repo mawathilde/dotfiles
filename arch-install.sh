@@ -92,7 +92,7 @@ echo -ne "
 -------------------------------------------------------------------------
 "
 reflector -a 48 -c France -f 5 -l 20 --sort rate --save /etc/pacman.d/mirrorlist
-mkdir /mnt &>/dev/null # Hiding error message if any
+mkdir -p /mnt &>/dev/null # Hiding error message if any
 echo -ne "
 -------------------------------------------------------------------------
                     Installing Prerequisites
