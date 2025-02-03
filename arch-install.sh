@@ -5,7 +5,7 @@
 # curl -sL https://install.mawathilde.fr | bash
 
 set -u pipefail
-trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
+trap 's=$?; [[ "$BASH_COMMAND" =~ ^umount ]] || { echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s; }' ERR
 
 exec 1> >(tee "stdout.log")
 exec 2> >(tee "stderr.log" >&2)
@@ -104,18 +104,15 @@ echo -ne "
 -------------------------------------------------------------------------
 "
 
-#umount -A --recursive /mnt # make sure everything is unmounted before we start
+umount -A --recursive /mnt &>/dev/null # Unmounting all mounted partitions
+
 # disk prep
 sgdisk -Z ${device} # zap all on disk
 sgdisk -a 2048 -o ${device} # new gpt disk 2048 alignment
 
 # create partitions
-sgdisk -n 1::+1M --typecode=1:ef02 --change-name=1:'BIOSBOOT' ${device} # partition 1 (BIOS Boot Partition)
-sgdisk -n 2::+300M --typecode=2:ef00 --change-name=2:'EFIBOOT' ${device} # partition 2 (UEFI Boot Partition)
+sgdisk -n 2::+500M --typecode=2:ef00 --change-name=2:'EFIBOOT' ${device} # partition 2 (UEFI Boot Partition)
 sgdisk -n 3::-0 --typecode=3:8300 --change-name=3:'ROOT' ${device} # partition 3 (Root), default start, remaining
-if [[ ! -d "/sys/firmware/efi" ]]; then # Checking for bios system
-    sgdisk -A 1:set:2 ${device} # set partition 2 (UEFI Boot Partition) as bootable
-fi
 partprobe ${device} # reread partition table to ensure it is correct
 
 # make filesystems
@@ -124,37 +121,6 @@ echo -ne "
                     Creating Filesystems
 -------------------------------------------------------------------------
 "
-# @description Creates the btrfs subvolumes. 
-createsubvolumes () {
-    btrfs subvolume create /mnt/@
-    btrfs subvolume create /mnt/@home
-    btrfs subvolume create /mnt/@var
-    btrfs subvolume create /mnt/@tmp
-    btrfs subvolume create /mnt/@.snapshots
-}
-
-# @description Mount all btrfs subvolumes after root has been mounted.
-mountallsubvol () {
-    mount -o ${MOUNT_OPTIONS},subvol=@home ${partition3} /mnt/home
-    mount -o ${MOUNT_OPTIONS},subvol=@tmp ${partition3} /mnt/tmp
-    mount -o ${MOUNT_OPTIONS},subvol=@var ${partition3} /mnt/var
-    mount -o ${MOUNT_OPTIONS},subvol=@.snapshots ${partition3} /mnt/.snapshots
-}
-
-# @description BTRFS subvolulme creation and mounting. 
-subvolumesetup () {
-	# create nonroot subvolumes
-    createsubvolumes     
-	# unmount root to remount with subvolume 
-    umount /mnt
-	# mount @ subvolume
-    mount -o ${MOUNT_OPTIONS},subvol=@ ${partition3} /mnt
-	# make directories home, .snapshots, var, tmp
-    mkdir -p /mnt/{home,var,tmp,.snapshots}
-	# mount subvolumes
-    mountallsubvol
-}
-
 
 if [[ "${device}" =~ "nvme" ]]; then
     partition2=${device}p2
@@ -164,22 +130,12 @@ else
     partition3=${device}3
 fi
 
-mkfs.vfat -F32 -n "EFIBOOT" ${partition2}
-# enter luks password to cryptsetup and format root partition
-echo -n "${password}" | cryptsetup -y -v luksFormat ${partition3} -
-# open luks container and ROOT will be place holder 
-echo -n "${password}" | cryptsetup open ${partition3} ROOT -
-# now format that container
-mkfs.btrfs -L ROOT ${partition3}
-# create subvolumes for btrfs
-mount -t btrfs ${partition3} /mnt
-subvolumesetup
-# store uuid of encrypted partition for grub
-echo ENCRYPTED_PARTITION_UUID=$(blkid -s UUID -o value ${partition3}) >> $CONFIGS_DIR/setup.conf
+mkfs.ext4 ${partition3} # format root partition as ext4
+mkfs.fat -F 32 ${partition2} # format boot partition as fat32
 
 # mount target
-mkdir -p /mnt/boot/efi
-mount -t vfat -L EFIBOOT /mnt/boot/
+mount ${partition3} /mnt # mount root
+mount --mkdir ${partition2} /mnt/boot # mount boot
 
 if ! grep -qs '/mnt' /proc/mounts; then
     echo "Drive is not mounted can not continue"
@@ -191,11 +147,28 @@ fi
 
 echo -ne "
 -------------------------------------------------------------------------
-                    Arch Install on Main Drive
+                    Arch Install
 -------------------------------------------------------------------------
 "
-pacstrap /mnt base base-devel linux linux-firmware vim nano sudo archlinux-keyring wget libnewt --noconfirm --needed
-echo "keyserver hkp://keyserver.ubuntu.com" >> /mnt/etc/pacman.d/gnupg/gpg.conf
+pacstrap /mnt base base-devel linux linux-firmware man-db vim zsh nano archlinux-keyring wget efibootmgr grub --noconfirm --needed
+
+# Network packages
+pacstrap /mnt networkmanager dhclient resolvconf --noconfirm --needed
+arch-chroot /mnt systemctl enable NetworkManager
+echo "### Network Packages Installed"
+
+if [ "$(lscpu | grep -o "AuthenticAMD")" == "AuthenticAMD" ]; then # Checking for AMD CPU
+    pacstrap /mnt amd-ucode --noconfirm --needed
+fi
+if [ "$(lscpu | grep -o "Intel")" == "Intel" ]; then # Checking for Intel CPU
+    pacstrap /mnt intel-ucode --noconfirm --needed
+fi
+
+# check graphics card
+if lspci | grep -i "nvidia" &>/dev/null; then
+    pacstrap /mnt nvidia nvidia-utils nvidia-settings --noconfirm --needed # install nvidia drivers
+fi
+
 cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
 
 genfstab -L /mnt >> /mnt/etc/fstab
@@ -204,35 +177,51 @@ echo "
 "
 cat /mnt/etc/fstab
 
-echo -ne "
--------------------------------------------------------------------------
-                    GRUB BIOS Bootloader Install & Check
--------------------------------------------------------------------------
-"
-if [[ ! -d "/sys/firmware/efi" ]]; then
-    grub-install --boot-directory=/mnt/boot ${device}
-else
-    pacstrap /mnt efibootmgr --noconfirm --needed
-fi
+arch-chroot /mnt /bin/bash <<EOF
+ln -sf /usr/share/zoneinfo/Europe/Paris /etc/localtime
+hwclock --systohc
+
+echo "fr_FR.UTF-8 UTF-8" > /etc/locale.gen
+locale-gen
+
+echo "LANG=fr_FR.UTF-8" > /etc/locale.conf
+echo "KEYMAP=fr" > /etc/vconsole.conf
+localectl --no-convert set-x11-keymap fr
+
+echo "${hostname}" > /etc/hostname
+EOF
+
+arch-chroot /mnt mkinitcpio -P # generate the system images
 
 echo -ne "
 -------------------------------------------------------------------------
-                    Checking for low memory systems <8G
+                    Setting up User
 -------------------------------------------------------------------------
 "
-TOTAL_MEM=$(cat /proc/meminfo | grep -i 'memtotal' | grep -o '[[:digit:]]*')
-if [[  $TOTAL_MEM -lt 8000000 ]]; then
-    # Put swap into the actual system, not into RAM disk, otherwise there is no point in it, it'll cache RAM into RAM. So, /mnt/ everything.
-    mkdir -p /mnt/opt/swap # make a dir that we can apply NOCOW to to make it btrfs-friendly.
-    chattr +C /mnt/opt/swap # apply NOCOW, btrfs needs that.
-    dd if=/dev/zero of=/mnt/opt/swap/swapfile bs=1M count=2048 status=progress
-    chmod 600 /mnt/opt/swap/swapfile # set permissions.
-    chown root /mnt/opt/swap/swapfile
-    mkswap /mnt/opt/swap/swapfile
-    swapon /mnt/opt/swap/swapfile
-    # The line below is written to /mnt/ but doesn't contain /mnt/, since it's just / for the system itself.
-    echo "/opt/swap/swapfile	none	swap	sw	0	0" >> /mnt/etc/fstab # Add swap to fstab, so it KEEPS working after installation.
-fi
+arch-chroot /mnt /bin/bash <<EOF
+echo "root:${password}" | chpasswd
+EOF
+
+arch-chroot /mnt useradd -m -s /bin/zsh $user
+arch-chroot /mnt /bin/bash <<EOF
+echo "${user}:${password}" | chpasswd
+EOF
+
+echo -ne "
+-------------------------------------------------------------------------
+                    GRUB Bootloader Install & Check
+-------------------------------------------------------------------------
+"
+
+mkdir -p /mnt/boot/EFI
+mount ${partition2} /mnt/boot/EFI
+
+mkdir -p /mnt/boot/grub
+arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
+arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/EFI --bootloader-id=GRUB
+
+#arch-chroot /mnt mkinitcpio -P # generate the system images
+
 echo -ne "
 -------------------------------------------------------------------------
                     SYSTEM READY FOR 1-setup.sh
