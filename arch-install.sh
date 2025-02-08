@@ -186,7 +186,9 @@ locale-gen
 
 echo "LANG=fr_FR.UTF-8" > /etc/locale.conf
 echo "KEYMAP=fr" > /etc/vconsole.conf
+
 localectl --no-convert set-x11-keymap fr
+localectl --no-convert set-keymap fr
 
 echo "${hostname}" > /etc/hostname
 EOF
@@ -209,6 +211,17 @@ EOF
 
 echo -ne "
 -------------------------------------------------------------------------
+                    Graphical Environment
+-------------------------------------------------------------------------
+"
+
+pacstrap /mnt xorg xorg-server gdm gnome gnome-shell gnome-control-center gnome-terminal gnome-keyring --noconfirm --needed
+
+arch-chroot /mnt systemctl enable gdm
+arch-chroot /mnt systemctl set-default graphical.target
+
+echo -ne "
+-------------------------------------------------------------------------
                     GRUB Bootloader Install & Check
 -------------------------------------------------------------------------
 "
@@ -224,6 +237,6 @@ arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/EFI --bo
 
 echo -ne "
 -------------------------------------------------------------------------
-                    SYSTEM READY FOR 1-setup.sh
+                    SYSTEM READY
 -------------------------------------------------------------------------
 "
