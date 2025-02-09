@@ -171,29 +171,16 @@ fi
 
 cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
 
+arch-chroot /mnt /bin/bash <<EOF
+echo "${hostname}" > /etc/hostname
+EOF
+
+
 genfstab -L /mnt >> /mnt/etc/fstab
 echo " 
   Generated /etc/fstab:
 "
 cat /mnt/etc/fstab
-
-arch-chroot /mnt /bin/bash <<EOF
-ln -sf /usr/share/zoneinfo/Europe/Paris /etc/localtime
-hwclock --systohc
-
-echo "fr_FR.UTF-8 UTF-8" > /etc/locale.gen
-locale-gen
-
-echo "LANG=fr_FR.UTF-8" > /etc/locale.conf
-echo "KEYMAP=fr" > /etc/vconsole.conf
-
-localectl --no-convert set-x11-keymap fr
-localectl --no-convert set-keymap fr
-
-echo "${hostname}" > /etc/hostname
-EOF
-
-arch-chroot /mnt mkinitcpio -P # generate the system images
 
 echo -ne "
 -------------------------------------------------------------------------
@@ -215,10 +202,26 @@ echo -ne "
 -------------------------------------------------------------------------
 "
 
-pacstrap /mnt xorg xorg-server gdm gnome gnome-shell gnome-control-center gnome-terminal gnome-keyring --noconfirm --needed
+pacstrap /mnt xorg xorg-server gdm gnome gnome-shell gnome-control-center gnome-terminal gnome-keyring gsettings-desktop-schemas --noconfirm --needed
 
-arch-chroot /mnt systemctl enable gdm
-arch-chroot /mnt systemctl set-default graphical.target
+arch-chroot /mnt systemctl enable gdm # enable gnome display manager
+arch-chroot /mnt systemctl set-default graphical.target # set default target to graphical
+
+arch-chroot /mnt /bin/bash <<EOF
+ln -sf /usr/share/zoneinfo/Europe/Paris /etc/localtime
+hwclock --systohc
+
+locale-gen
+echo "LANG=fr_FR.UTF-8" > /etc/locale.conf
+echo "KEYMAP=fr" > /etc/vconsole.conf
+
+localectl --no-convert set-keymap fr
+localectl --no-convert set-x11-keymap fr
+EOF
+
+arch-chroot /mnt mkinitcpio -P # generate the system images
+
+arch-chroot /mnt gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'fr')]"
 
 echo -ne "
 -------------------------------------------------------------------------
@@ -226,12 +229,10 @@ echo -ne "
 -------------------------------------------------------------------------
 "
 
-mkdir -p /mnt/boot/EFI
-mount ${partition2} /mnt/boot/EFI
-
 mkdir -p /mnt/boot/grub
+
 arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
-arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/EFI --bootloader-id=GRUB
+arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 
 #arch-chroot /mnt mkinitcpio -P # generate the system images
 
