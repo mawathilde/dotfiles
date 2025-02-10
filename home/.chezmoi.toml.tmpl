@@ -17,19 +17,13 @@
 {{- end -}}
 
 {{- $hostname := .chezmoi.hostname -}}
-{{- if not $ephemeral -}}
-{{-   if eq $hostname "DEBIAN-MAWA" -}}
-{{-     $personal = true -}}
-{{-   else if eq $hostname "LAPTOP-MAWA" -}}
-{{-     $personal = true -}}
-{{-   else if stdinIsATTY -}}
-{{-     $headless = promptBoolOnce . "headless" "headless" -}}
-{{-     $ephemeral = promptBoolOnce . "ephemeral" "ephemeral" -}}
-{{-   else -}}
-{{-     $ephemeral = true -}}
-{{-     $headless = true -}}
-{{-   end -}}
+
+{{/* personal secrets */}}
+{{- if eq .chezmoi.username "mawa" -}}
+{{-   $personal = true -}}
 {{- end -}}
+
+{{/* default values */}}
 
 {{- $username := "Mawathilde" -}}
 {{- $email := "dev@mawathilde.fr" -}}
@@ -38,7 +32,6 @@
     ephemeral = {{ $ephemeral }}
     username = {{ $username | quote }}
     email = {{ $email | quote }}
-    headless = {{ $headless }}
     hostname = {{ $hostname | quote }}
     personal = {{ $personal }}
     osid = {{ $osID | quote }}

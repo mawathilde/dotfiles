@@ -56,7 +56,7 @@ if [ ! -f /sys/firmware/efi/fw_platform_size ]; then
 fi
 
 echo -e "\n### Installing additional tools"
-pacman -Sy --noconfirm archlinux-keyring 
+pacman -S --noconfirm archlinux-keyring #update keyrings to latest to prevent packages failing to install
 pacman -Sy --noconfirm --needed pacman-contrib terminus-font
 pacman -Sy --noconfirm git reflector dialog wget
 
@@ -150,7 +150,7 @@ echo -ne "
                     Arch Install
 -------------------------------------------------------------------------
 "
-pacstrap /mnt base base-devel linux linux-firmware man-db vim zsh nano archlinux-keyring wget efibootmgr grub --noconfirm --needed
+pacstrap /mnt base base-devel linux linux-firmware man-db vim zsh nano archlinux-keyring wget git efibootmgr grub --noconfirm --needed
 
 # Network packages
 pacstrap /mnt networkmanager dhclient resolvconf --noconfirm --needed
@@ -202,7 +202,7 @@ echo -ne "
 -------------------------------------------------------------------------
 "
 
-pacstrap /mnt xorg xorg-server gdm gnome gnome-shell gnome-control-center gnome-terminal gnome-keyring gsettings-desktop-schemas --noconfirm --needed
+pacstrap /mnt xorg xorg-server gdm gnome gnome-shell gnome-control-center gnome-keyring gsettings-desktop-schemas --noconfirm --needed
 
 arch-chroot /mnt systemctl enable gdm # enable gnome display manager
 arch-chroot /mnt systemctl set-default graphical.target # set default target to graphical
@@ -213,15 +213,16 @@ hwclock --systohc
 
 locale-gen
 echo "LANG=fr_FR.UTF-8" > /etc/locale.conf
+echo "fr_FR.UTF-8 UTF-8" > /etc/locale.gen
 echo "KEYMAP=fr" > /etc/vconsole.conf
 
 localectl --no-convert set-keymap fr
 localectl --no-convert set-x11-keymap fr
+
+locale-gen
 EOF
 
 arch-chroot /mnt mkinitcpio -P # generate the system images
-
-arch-chroot /mnt gsettings set org.gnome.desktop.input-sources sources "[('xkb', 'fr')]"
 
 echo -ne "
 -------------------------------------------------------------------------
@@ -234,7 +235,18 @@ mkdir -p /mnt/boot/grub
 arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
 arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
 
-#arch-chroot /mnt mkinitcpio -P # generate the system images
+echo -ne "
+-------------------------------------------------------------------------
+                    DOT FILES
+-------------------------------------------------------------------------
+"
+
+arch-chroot /mnt /bin/bash <<EOF
+
+pacman -S --noconfirm --needed chezmoi
+su - $user -c "chezmoi init --apply mawathilde --branch archlinux"
+
+EOF
 
 echo -ne "
 -------------------------------------------------------------------------
