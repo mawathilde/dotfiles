@@ -1,0 +1,24 @@
+#!/bin/bash
+
+set -eufo pipefail
+
+fc-cache
+
+# Disable the touchpad while typing
+gsettings set org.gnome.desktop.peripherals.touchpad disable-while-typing true
+
+gsettings set org.gnome.desktop.peripherals.touchpad natural-scroll true # Natural scrolling
+
+#dark theme (appearance)
+gsettings set org.gnome.desktop.interface gtk-theme 'Adwaita-dark'
+
+gsettings set org.gnome.shell favorite-apps "[ \
+	'org.gnome.Console.desktop', \
+{{ if lookPath "firefox" -}}
+	'firefox.desktop', \
+{{ end -}}
+{{ if lookPath "code" -}}
+	'com.visualstudio.code.desktop', \
+{{ end -}}
+	'org.gnome.Nautilus.desktop' \
+]"

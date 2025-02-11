@@ -1,0 +1,28 @@
+{{ if eq .osid "linux-arch" -}}
+
+{{ $packages := list
+     "bat"
+     "fzf"
+     "git"
+     "git-lfs"
+     "shellcheck"
+     "zsh"
+     "hyfetch"
+     "fastfetch" -}}
+
+{{ $sudo := "sudo " -}}
+{{ if eq .chezmoi.username "root" -}}
+{{   $sudo = "" -}}
+{{ end -}}
+
+#!/bin/bash
+
+set -eufo pipefail
+
+for package in {{ $packages | join " " }}; do
+    if ! pacman -Qi $package &> /dev/null; then
+       {{ $sudo }} pacman -Sy --noconfirm $package
+    fi
+done
+
+{{ end }}
