@@ -1,0 +1,143 @@
+#!/bin/bash
+
+####################################################
+#
+# Description : Permet d'ouvrir Keepass avec Rclone
+#
+# Auteur : Florian Brisset
+#
+# Date : 17/12/2022
+#
+# Licence : GPL3
+####################################################
+
+#=====================================
+#	Functions
+#=====================================
+
+export RCLONE_CONFIG_PASS=D6FB9491AC
+
+function create_config() {
+	# Create config dir and config file if not exist
+	mkdir -p "$PATH_CONFIG" # Crée le dossier config si inexistant
+	if ! [[ -f "$PATH_CONFIG/config" ]];then
+		echo "
+# config file 
+KEEPASS_FILE=
+REMOTE=
+KEYFILE=
+REMOTE_BACKUP=" > "$PATH_CONFIG"/config
+		write_log "Create config file : $PATH_CONFIG/config"
+	fi
+}
+
+function header_log() {
+	# Create a header for each startup
+	echo "========== $(date +"%D %T") ==========">>"$PATH_LOG"
+}
+
+function write_log(){
+	# Write log in log file : $PATH_CONFIG/keepass_launcher.log
+	echo "$1"
+	echo "$(date +"%D %T") $1">>"$PATH_LOG"
+}
+
+function sync() {
+	# Sync file with rclone and catch error 
+	rclone_error=$(rclone copy --timeout 9000ms "$1" "$2" 2>&1 1>/dev/null)
+	if [ "$rclone_error" ];then
+		write_log "$1 to $2 sync error : $rclone_error"
+	else
+		write_log "Sync $1 to $2"
+	fi
+}
+
+function start_rclone() {
+	# Create temp dir and sync keepass file
+	tempdir=$(mktemp -d) && write_log "Create temp dir : $tempdir"
+	# Copy keepass file
+	sync "$REMOTE/$KEEPASS_FILE" "$tempdir/"
+	if [[ "$rclone_error" == "" ]];then
+		file_path="$tempdir/$KEEPASS_FILE"
+		checksum_file=$(md5sum "$tempdir/$KEEPASS_FILE")
+		write_log "Checksum of kdbx : $checksum_file"
+	else
+		rm -rf "$tempdir" # Del folder because its unused
+	fi
+}
+
+function start_keepass() {
+	# Funcion start keepass with file as $1
+	write_log "Start Keepass with : $1 and $2 as keyfile"
+    /usr/bin/flatpak run --branch=stable --arch=x86_64 --command=keepassxc --file-forwarding org.keepassxc.KeePassXC --keyfile "$2" "$1" -platform xcb &>/dev/null
+}
+
+function stop_rclone(){
+	# Sync and backup file and delete temp dir
+	# $1 is the local file
+	if [[ $(md5sum "$1") != "$checksum_file" ]];then
+		sync "$1" "$REMOTE"
+		# Backup kdbx file to another remote
+		if [[ "$REMOTE_BACKUP" ]];then
+			sync "$1" "$REMOTE_BACKUP"
+		fi
+	else
+		write_log "File is the same of the remote"
+	fi
+	write_log "Delete temp dir : $(dirname "$1")"
+	rm -rf "$(dirname "$1")"
+}
+
+#=====================================
+#	Setup
+#=====================================
+
+# Constant
+# declare -r est l'equivalent de const en C++
+declare -r PATH_CONFIG="$HOME/.config/keepass-x-rclone"
+declare -r PATH_LOG="$PATH_CONFIG/keepass_launcher.log"
+
+# Variable
+keepass_pid="$(pgrep -u "$(whoami)" keepassxc)"
+file_path=""
+checksum_file=""
+
+create_config # Create config dir and config file if not exist
+
+# Load config file 
+write_log "Read config file : $PATH_CONFIG/config"
+# Read config file line per line 
+while read -r line;do
+	if [[ "$line" != "" && "${line:0:1}" != "#" ]];then
+		line=$(echo "$line" | tr -d '"') # tr allow to use "" on config file
+		declare -r "$line" # create constant variable with config file
+	fi
+done < "$PATH_CONFIG/config"
+
+#=====================================
+#	Main
+#=====================================
+
+# Check if rclone is installed
+if ! [[ "$(command -v rclone)" ]];then
+	write_log "Rclone is not installed"
+	exit 
+fi
+
+# Pour détecter si KeepassXC est ouvert
+if [[ "$keepass_pid" ]]; then
+	write_log "Keepass is already open"
+elif [[ "$KEEPASS_FILE" && "$REMOTE" ]];then
+	# Start log for the session
+	header_log
+	start_rclone  # Download keepass file 
+	if [[ "$file_path" ]];then
+		sleep 2
+		start_keepass "$file_path" "$KEYFILE" # Open keepass
+		stop_rclone "$file_path"   # Stop and sync keepass file
+	fi
+else 
+	write_log "Fill config file please : $PATH_CONFIG/config"
+fi
+
+write_log "End of script"
