@@ -82,8 +82,10 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
+  archlinux
+  vscode
+  #asdf
   git
-  asdf
   web-search
   docker
   docker-compose
@@ -92,12 +94,18 @@ plugins=(
   npm
   command-not-found
   common-aliases
-  ubuntu
   sudo
+  gitfast
+  colorize
+  cp
   zsh-syntax-highlighting
 )
 
 source $ZSH/oh-my-zsh.sh
+
+# Add asdf to the shell
+. $HOME/.asdf/asdf.sh
+. $HOME/.asdf/completions/asdf.bash
 
 # User configuration
 
