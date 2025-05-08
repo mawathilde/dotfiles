@@ -13,8 +13,7 @@
     "modules-center": ["hyprland/window"],
     "modules-right": [
         "tray",
-        "memory",
-        "cpu",
+        "bluetooth",
         "network",
         "battery",
         "backlight",
@@ -64,6 +63,15 @@
         "on-scroll-up": "brightnessctl set 1%+",
         "on-scroll-down": "brightnessctl set 1%-",
         "min-length": 6
+    },
+
+    "bluetooth": {
+        "format": "󰂱 Not Connected",
+        "format-connected": "󰂯 {device_alias}",
+        "format-disconnected": "󰂱 Disconnected",
+        "format-pairing": "󰂱 Pairing",
+        "tooltip": false,
+        "on-click": "blueman-manager"
     },
 
     "battery": {

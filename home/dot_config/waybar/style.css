@@ -47,6 +47,7 @@ window#waybar {
 #network,
 #cpu,
 #memory,
+#bluetooth,
 #workspaces,
 #tray,
 #backlight {
@@ -72,6 +73,11 @@ window#waybar {
   margin-left: 10px;
   padding-right: 0px;
   padding-left: 5px;
+}
+
+#bluetooth {
+  border-radius: 10px 10px 10px 10px;
+  margin-right: 5px;
 }
 
 #cpu {
