@@ -9,7 +9,21 @@
      "zsh"
      "hyfetch"
      "fastfetch"
-     "neovim" -}}
+     "neovim"
+     "hyprland"
+     "hypridle"
+     "hyprpaper"
+     "hyprlock"
+     "hyprcursor"
+     "kitty"
+     "waybar"
+     "wofi"
+     "noto-fonts-emoji"
+     "noto-fonts"
+     "bluez"
+     "blueman"
+     "pipewire"
+-}}
 
 {{ $sudo := "sudo " -}}
 {{ if eq .chezmoi.username "root" -}}
@@ -22,7 +36,8 @@ set -eufo pipefail
 
 for package in {{ $packages | join " " }}; do
     if ! pacman -Qi $package &> /dev/null; then
-       {{ $sudo }} pacman -Sy --noconfirm $package
+        echo "➕ Installing $package"
+        {{ $sudo }} pacman -Sy --noconfirm $package
     fi
 done
 
