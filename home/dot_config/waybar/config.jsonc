@@ -7,12 +7,11 @@
     "gtk-layer-shell": true,
     "height": 0,
     "modules-left": [
-        "clock",
-        "hyprland/workspaces"
+        "hyprland/workspaces",
+        "tray"
     ],
-    "modules-center": ["hyprland/window"],
+    "modules-center": ["clock"],
     "modules-right": [
-        "tray",
         "bluetooth",
         "network",
         "battery",
@@ -27,6 +26,7 @@
     
     "hyprland/workspaces": {
         "disable-scroll": true,
+        "active-only": false,
         "all-outputs": true,
         "on-click": "activate"
         //"format": "{icon}",
@@ -38,7 +38,7 @@
     },
 
     "clock": {
-        "format": "{:%A    %d %B %Y    %H:%M:%S}",
+        "format": "{:%H:%M:%S}",
         "interval": 1,
         "rotate": 0,
         "tooltip-format": "<tt>{calendar}</tt>",
@@ -80,6 +80,7 @@
             "warning": 30,
             "critical": 20
         },
+        "interval": 5,
         "format": "{icon} {capacity}%",
         "format-charging": " {capacity}%",
         "format-plugged": " {capacity}%",
