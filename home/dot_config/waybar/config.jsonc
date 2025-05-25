@@ -13,16 +13,12 @@
     "modules-center": ["clock"],
     "modules-right": [
         "bluetooth",
-        "network",
-        "battery",
         "backlight",
         "pulseaudio",
-        "pulseaudio#microphone"
+        "network",
+        "battery",
+        "custom/power"
     ],
-
-    "hyprland/window": {
-        "format": "󰣇 {}"
-    },
     
     "hyprland/workspaces": {
         "disable-scroll": true,
@@ -66,7 +62,7 @@
     },
 
     "bluetooth": {
-        "format": "󰂱",
+        "format": "󰂯",
         "format-connected": "󰂯 {device_alias}",
         "format-disconnected": "󰂱 Disconnected",
         "format-pairing": "󰂱 Pairing",
@@ -107,40 +103,6 @@
         }
     },
 
-    "pulseaudio#microphone": {
-        "format": "{format_source}",
-        "format-source": " {volume}%",
-        "format-source-muted": "  Muted",
-        "on-click": "pamixer --default-source -t",
-        "on-scroll-up": "pamixer --default-source -i 5",
-        "on-scroll-down": "pamixer --default-source -d 5",
-        "scroll-step": 5
-    },
-
-    "memory": {
-        "states": {
-            "c": 90, // critical
-            "h": 60, // high
-            "m": 30 // medium
-        },
-        "interval": 10,
-        "format": "󰾆 {used}GB",
-        "format-m": "󰾅 {used}GB",
-        "format-h": "󰓅 {used}GB",
-        "format-c": " {used}GB",
-        "format-alt": "󰾆 {percentage}%",
-        "max-length": 10,
-        "tooltip": true,
-        "tooltip-format": "󰾆 {percentage}%\n {used:0.1f}GB/{total:0.1f}GB"
-    },
-
-    "cpu": {
-        "interval": 10,
-        "format": "󰍛 {usage}%",
-        "format-alt": "{icon0}{icon1}{icon2}{icon3}",
-        "format-icons": ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
-    },
-
     "network": {
         "tooltip": true,
         "format-wifi": "  {essid}",
@@ -151,5 +113,12 @@
         "tooltip-format-disconnected": "Disconnected",
         "format-alt": "<span foreground='#99ffdd'> {bandwidthDownBytes}</span> <span foreground='#ffcc66'> {bandwidthUpBytes}</span>",
         "interval": 2
+    },
+
+    "custom/power": {
+        "format": "",
+        "tooltip": true,
+        "tooltip-format": "Power off",
+        "on-click": "systemctl poweroff"
     }
 }
