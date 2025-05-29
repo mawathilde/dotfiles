@@ -4,6 +4,7 @@
 
   // ⬇️ Logo settings with padding
   "logo": {
+    "type": "kitty-direct",
     "source": "~/.config/fastfetch/minimiku.png",
     "padding": {
       "top": 2,
