@@ -1,4 +1,4 @@
-# 🏠 Dotfiles — mawathilde (⚠️ WIP ⚠️)
+# 🏠 Dotfiles - mawathilde (⚠️ WIP ⚠️)
 
 My personal dotfiles for a minimal, fully encrypted Arch Linux setup with [Hyprland](https://github.com/hyprwm/Hyprland).
 
@@ -28,13 +28,6 @@ My system is based on:
 For a full installation guide, see:
 
 - [`INSTALLATION.md`](./INSTALLATION.md) → Disk, encryption, btrfs, systemd-boot
-
-## 🖥 Multi-device Support (WIP)
-
-My Hyprland config supports different monitor setups (desktop, laptop, VM).  
-I manage this using `hostname` detection or custom scripts in the `scripts/` folder.
-
-You can adapt `monitors.conf` to your needs.
 
 ## 🤝 License
 
