@@ -22,7 +22,12 @@
      "noto-fonts"
      "bluez"
      "blueman"
+     "tlp"
+     "brightnessctl"
      "pipewire"
+     "wireplumber"
+     "qt5ct"
+     "qt6ct"
 -}}
 
 {{ $sudo := "sudo " -}}
@@ -34,11 +39,20 @@
 
 set -eufo pipefail
 
+missing=()
+
 for package in {{ $packages | join " " }}; do
-    if ! pacman -Qi $package &> /dev/null; then
-        echo "➕ Installing $package"
-        {{ $sudo }} pacman -Sy --noconfirm $package
+    if ! pacman -Qi "$package" &>/dev/null; then
+        echo "➕ Missing: $package"
+        missing+=("$package")
     fi
 done
+
+if [ ${#missing[@]} -gt 0 ]; then
+    echo "📦 Installing missing packages: ${missing[*]}"
+    {{ $sudo }} pacman -S --noconfirm "${missing[@]}"
+else
+    echo "✅ All packages already installed"
+fi
 
 {{ end }}
