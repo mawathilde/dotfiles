@@ -7,151 +7,251 @@
 > - French AZERTY keyboard
 > - Full disk encryption with LUKS2
 > - Btrfs with subvolumes
-> - `systemd-boot` as bootloader 
+> - `grub` as bootloader 
 > 
 > You’re free to reuse and adapt this guide, but **review and edit commands to match your hardware and setup.**
 
-## 1. Boot into Arch ISO
+# Preliminary Steps
 
-```bash
+First, boot into the Arch Linux installation media.  
+Then, set the keyboard layout:
+```zsh
 loadkeys fr
-ping archlinux.org
 ```
 
----
+Check if the system is booted in UEFI mode
+```zsh
+cat /sys/firmware/efi/fw_platform_size
+```
 
-## 2. Partition the Disk
+Check network connectivity:
+```zsh
+ping -c 3 archlinux.org
+```
 
-```bash
-disk="/dev/vda"
+# Installation Steps
 
+## Partitioning
+
+> **Note**: This guide uses `sgdisk` for partitioning.
+> If you prefer `fdisk` or `parted`, adjust the commands accordingly.
+
+| Type | Size |
+| --- | --- |
+| UEFI | 512MB |
+| Linux Filesystem | Ramaining space |
+
+```zsh
+
+# Zap the disk.
 sgdisk -Z "$disk"
-sgdisk -n 1::+512M -t 1:ef00 -c 1:EFI "$disk"
-sgdisk -n 2::-0     -t 2:8300 -c 2:cryptroot "$disk"
+
+# UEFI partition (512MB)
+sgdisk -n 1::+512M -t 1:ef00 "$disk"
+
+# Linux filesystem partition (remaining space)
+sgdisk -n 2::-0     -t 2:8300 "$disk"
 ```
 
----
+## Encryption
 
-## 3. Encrypt with LUKS
+I encrypt the root partition with LUKS to keep everything secure. First, I format the partition, then I open it so it can be used for the rest of the setup.
 
-```bash
-cryptsetup luksFormat ${disk}2
-cryptsetup open ${disk}2 cryptroot
+```zsh
+cryptsetup luksFormat /dev/vda2 # Confirm with 'YES' and set a passphrase.
+cryptsetup open /dev/vda2 cryptroot # This creates a mapping at /dev/mapper/cryptroot
 ```
 
----
+## Formatting
 
-## 4. Format & Mount Btrfs
+Now, I format the partitions. The first partition is formatted as FAT32 for UEFI, and the second partition is formatted as Btrfs.
 
-```bash
-mkfs.fat -F32 ${disk}1
+Btrfs is a modern filesystem that supports features like snapshots and subvolumes, which are useful for managing system files and user data.
+
+> **Note**: The `mkfs.btrfs` command will create a Btrfs filesystem on the encrypted partition, which is mapped to `/dev/mapper/cryptroot`.
+
+```zsh
+# Format the UEFI partition
+mkfs.fat -F32 /dev/vda1
+
+# Format the encrypted partition with Btrfs
 mkfs.btrfs /dev/mapper/cryptroot
-mount /dev/mapper/cryptroot /mnt
 
+# Mount the Btrfs filesystem
+mount /dev/mapper/cryptroot /mnt
+```
+
+## Mounting Subvolumes
+
+```zsh
+# Create the subvolumes, I choose to create subvolumes for / and /home.
 btrfs subvolume create /mnt/@
 btrfs subvolume create /mnt/@home
-btrfs subvolume create /mnt/@pkg
+
+# Unmount the root fs
 umount /mnt
 ```
 
-```bash
-mount -o compress=zstd,subvol=@        /dev/mapper/cryptroot /mnt
-mkdir -p /mnt/{boot,home,var/cache/pacman/pkg}
-mount -o compress=zstd,subvol=@home    /dev/mapper/cryptroot /mnt/home
-mount -o compress=zstd,subvol=@pkg     /dev/mapper/cryptroot /mnt/var/cache/pacman/pkg
-mount ${disk}1 /mnt/boot
+I'll compress the subvolumes using **zstd** for better performance and space efficiency.
+
+```zsh
+# Mount the root and home subvolumes with compression
+mount -o compress=zstd,subvol=@ /dev/mapper/cryptroot /mnt
+
+mkdir -p /mnt/home
+mount -o compress=zstd,subvol=@home /dev/mapper/cryptroot /mnt/home
 ```
 
----
+I'll also create a mount point for the boot partition and mount it.
+I choose to use the `/boot` directory for the UEFI partition. 
 
-## 5. Install Base System
+> **Note**: It may be useful to use /boot/efi. To be able to restore the kernel with @ subvolume. **I plan to do this in the future.**
 
-```bash
-pacstrap -K /mnt base linux linux-firmware amd-ucode btrfs-progs zsh sudo vim
+```zsh
+mkdir -p /mnt/boot
+mount /dev/vda1 /mnt/boot
 ```
 
----
+## Packages installation
 
-## 6. fstab & chroot
+```zsh
+# This will install the base system, kernel, firmware, and some essential tools.
+# "base, linux, linux-firmware" are the essential packages for a minimal Arch Linux installation
+# base-devel" base development packages
+# amd-ucode: AMD microcode for CPU updates. Use "intel-ucode" for Intel CPUs.
+# git: version control system  
+# btrfs-progs: Btrfs filesystem utilities  
+# cryptsetup: LUKS encryption tools  
+# grub: bootloader  
+# efibootmgr: EFI boot management  
+# grub-btrfs: detects Btrfs snapshots  
+# inotify-tools: filesystem event monitoring  
+# timeshift: system snapshot utility  
+# networkmanager: network management  
+# pipewire: audio server
+# wireplumber: session manager for PipeWire  
+# reflector: updates mirrorlist  
+# zsh: alternative shell  
+# zsh-completions: extra completions for Zsh  
+# zsh-autosuggestions: command suggestions  
+# openssh: SSH client and server  
+# man: manual pages  
+# sudo: run commands as root  
+# nano: text editor
+pacstrap -K /mnt base base-devel linux linux-firmware amd-ucode git btrfs-progs cryptsetup grub efibootmgr grub-btrfs inotify-tools timeshift networkmanager pipewire pipewire-alsa pipewire-pulse pipewire-jack wireplumber reflector zsh zsh-completions zsh-autosuggestions openssh man sudo nano
+```
 
-```bash
+
+## Fstab
+
+```zsh
+# Fetch the current mount points and generate the fstab file.
+# The -U option uses UUIDs for the partitions, which is recommended for stability.
 genfstab -U /mnt >> /mnt/etc/fstab
+
+# Verify the fstab file
+cat /mnt/etc/fstab
+```
+
+## Chroot into the new system
+
+```zsh
+# Change root into the new system
 arch-chroot /mnt
 ```
 
----
+## Timezone
 
-## 7. System Config
-
-```bash
+```zsh
+# Set the timezone to Paris
 ln -sf /usr/share/zoneinfo/Europe/Paris /etc/localtime
+
+# Synchronize the hardware clock with the system clock
 hwclock --systohc
-
-echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
-echo "fr_FR.UTF-8 UTF-8" >> /etc/locale.gen
-locale-gen
-
-echo "LANG=en_US.UTF-8" > /etc/locale.conf
-echo "KEYMAP=fr" > /etc/vconsole.conf
-echo "hostname" > /etc/hostname
 ```
 
----
+## TTY keymap
 
-## 8. Initramfs (mkinitcpio)
+To make sure the keyboard layout is set correctly in the console, I need to create a keymap file.
 
-Edit `/etc/mkinitcpio.conf` → HOOKS :
+```zsh
+echo "KEYMAP=fr" > /etc/vconsole.conf
+```
+
+## Hostname
+
+```zsh
+echo "archlinux" > /etc/hostname
+```
+
+## Initramfs configuration
+
+To ensure the system can boot properly with the encrypted Btrfs filesystem, I need to edit the `mkinitcpio` configuration file.
+
+Edit `/etc/mkinitcpio.conf` and modify the `HOOKS` and `MODULES` line to include the necessary hooks for encryption:
 
 ```ini
-HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole consolefont block filesystems sd-encrypt fsck) 
+MODULES=(btrfs)
+
+HOOKS=(base udev autodetect microcode modconf kms keyboard keymap consolefont block filesystems encrypt fsck)
 ```
 
-Then:
+Then, regenerate the initramfs:
 
-```bash
+```zsh
 mkinitcpio -P
 ```
 
----
+## User & Passwords
 
-## 9. Bootloader (systemd-boot)
+```zsh
+# Set the root password
+passwd
 
-```bash
-bootctl install
-```
-
-Create `/boot/loader/entries/arch.conf`:
-
-```ini
-title   Arch Linux
-linux   /vmlinuz-linux
-initrd  /initramfs-linux.img
-options cryptdevice=UUID=<UUID>:cryptroot root=/dev/mapper/cryptroot rootflags=subvol=@ rw
-```
-
-Replace `<UUID>`:
-
-```bash
-blkid -s UUID -o value ${disk}2
-```
-
----
-
-## 10. Create User
-
-```bash
-passwd  # for root
+# Create a new user and set its password
+# -m creates a home directory
+# -G wheel adds the user to the wheel group for sudo access
 useradd -m -G wheel mawa
 passwd mawa
-EDITOR=vim visudo  # uncomment: %wheel ALL=(ALL:ALL) ALL
+
+# Edit the sudoers file to allow the wheel group to use sudo
+EDITOR=nano visudo  # Uncomment the line: %wheel ALL=(ALL:ALL) ALL
 ```
 
----
+## GRUB Bootloader
 
-## 11. Reboot
+```zsh
+grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
+```
 
-```bash
+Edit the GRUB configuration file `/etc/default/grub` to set these options:
+```ini
+GRUB_ENABLE_CRYPTODISK=y
+GRUB_CMDLINE_LINUX="cryptdevice=UUID=<UUID>:cryptroot"
+```
+
+Replace `<UUID>` with the UUID of the encrypted partition:
+```
+blkid -s UUID -o value /dev/vda2
+```
+
+Then, generate the GRUB configuration file:
+```zsh
+grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+## Clean up and exit
+
+```zsh
+# Enable NetworkManager service
+systemctl enable NetworkManager
+
+# Exit the chroot environment
 exit
+
+# Unmount all filesystems
 umount -R /mnt
+
+# Reboot the system
 reboot
 ```
